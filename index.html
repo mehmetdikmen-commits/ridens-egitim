@@ -127,7 +127,8 @@
   .opt.disabled{pointer-events:none}
   .explain{font-size:13.5px;border-radius:10px;padding:11px 13px;margin-top:4px;display:none}
   .explain.show{display:block}
-  .explain.ok{background:var(--tip-bg);border-left:4px solid var(--green);color:#067a52}
+  .explain.late{background:#FFF7E0;border:1px solid #E8C15A;color:#7A5C00}
+.explain.ok{background:var(--tip-bg);border-left:4px solid var(--green);color:#067a52}
   .explain.no{background:var(--danger-bg);border-left:4px solid var(--danger);color:#7d1a12}
   .result{text-align:center;background:#fff;border:1px solid var(--line);border-radius:16px;padding:28px 20px}
   .result .big{font-size:60px;margin-bottom:6px}
@@ -248,7 +249,7 @@ function save(){ try{ localStorage.setItem("ridens_game3",JSON.stringify(store))
 let user=null, CC=null;
 const app=document.getElementById("app"), hud=document.getElementById("hud");
 
-const LIVES=3, Q_TIME=20, BASE_PTS=10, LIFE_BONUS=25, FINISH_BONUS=50, EXAM_LEN=15, WRONG_PENALTY=5, FIRST_BONUS=100, SEC_Q=4;
+const LIVES=3, Q_TIME=20, BASE_PTS=10, LIFE_BONUS=25, FINISH_BONUS=50, EXAM_LEN=15, WRONG_PENALTY=5, FIRST_BONUS=100, SEC_Q=4, LATE_PTS=3;
 
 function initials(n){return n.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();}
 function K(cid,lk){return cid+"::"+lk;}
@@ -427,7 +428,7 @@ function saveRun(){ const p=prof(); p.run=p.run||{}; p.run[CC.id]={sec:ex.si,liv
 function clearRun(){ const p=prof(); if(p.run){ delete p.run[CC.id]; save(); } }
 function restartExam(){ clearRun(); startExam(false); }
 function startExam(resume){
-  ex={secs:buildSections(), si:0, i:0, lives:LIVES, score:0, streak:0, timer:null, remain:Q_TIME, answered:false};
+  ex={secs:buildSections(), si:0, i:0, lives:LIVES, score:0, streak:0, timer:null, remain:Q_TIME, answered:false, late:false};
   if(resume){ const r=(prof().run||{})[CC.id]; if(r){ ex.si=Math.min(r.sec, ex.secs.length-1); ex.lives=r.lives; ex.score=r.score; } }
   sectionIntro();
 }
@@ -464,7 +465,7 @@ function examRender(){
     <div id="opts">${q.opts.map((o,k)=>`<button class="opt" id="o${k}" onclick="examPick(${k})">${o}</button>`).join("")}</div>
     <div class="explain" id="exp"></div>
     <button class="btn" id="nx" disabled onclick="examNext()">Devam →</button></div>`;
-  ex.answered=false; ex.remain=Q_TIME; startTimer(); window.scrollTo(0,0);
+  ex.answered=false; ex.late=false; ex.remain=Q_TIME; startTimer(); window.scrollTo(0,0);
 }
 function startTimer(){
   clearInterval(ex.timer);
@@ -482,7 +483,14 @@ function examPick(k){
   const q=ex.secs[ex.si].pool[ex.i]; disableOpts();
   const cbtn=document.getElementById("o"+q.a); if(cbtn)cbtn.classList.add("correct");
   const exl=document.getElementById("exp");
-  if(k===q.a){
+  if(k===q.a && ex.late){
+    ex.streak=0;
+    ex.score+=LATE_PTS;
+    sndCorrect();
+    exl.className="explain ok show";
+    exl.innerHTML=`✓ Doğru (süre doldu) <b>+${LATE_PTS} puan</b> <small>(hız ve seri bonusu yok)</small><br>${q.ex}`;
+    updHud(); afterAnswer();
+  } else if(k===q.a){
     ex.streak++;
     const speed=Math.round(Math.max(0,ex.remain)/Q_TIME*BASE_PTS);
     const sb=Math.min(ex.streak,5)*2;
@@ -498,10 +506,11 @@ function examPick(k){
   }
 }
 function examTimeout(){
-  if(ex.answered)return; ex.answered=true; disableOpts();
-  const q=ex.secs[ex.si].pool[ex.i]; const cbtn=document.getElementById("o"+q.a); if(cbtn)cbtn.classList.add("correct");
-  sndWrong(); recErr();
-  loseLife("⏱ Süre doldu! <b>−"+WRONG_PENALTY+" puan</b><br>"+q.ex);
+  if(ex.answered)return; ex.late=true;
+  try{beep(300,0.18,"sine",0,0.06);}catch(e){}
+  const bar=document.getElementById("tbar"); if(bar)bar.style.width="0%";
+  const exl=document.getElementById("exp");
+  if(exl){ exl.className="explain late show"; exl.innerHTML="⏱ Süre doldu — yine de cevaplayabilirsin, ama en fazla <b>+"+LATE_PTS+" puan</b> alırsın."; }
 }
 function recErr(){
   try{ const p=prof(); p.err=p.err||{}; p.err[CC.id]=p.err[CC.id]||{};
