@@ -699,9 +699,10 @@ async function mgrDelete(enc){
 }
 function copyCSV(){
   const rows=window._mrows||[];
-  let csv="Personel,Puan,Kilavuz Sayisi,Sure(dk),Ders(dk),Giris Sayisi,Son Oynama"+COURSES.map(c=>","+c.title.split(' ')[0]+" Puan").join("")+"\n";
-  rows.forEach(r=>{csv+=`${r.n},${r.total},${r.done},${Math.round((r.t||0)/60)},${Math.round((r.lt||0)/60)},${r.sc||0},${r.last?new Date(r.last).toLocaleDateString("tr-TR"):""}`;COURSES.forEach(c=>{const cc=r.courses&&r.courses[c.id];csv+=","+(cc?cc.score:"");});csv+="\n";});
-  copyText(csv,"CSV panoya kopyalandı. Excel'e yapıştırabilirsin.");
+  const S="\t"; const clean=x=>String(x==null?"":x).replace(/[\t\r\n]+/g," ");
+  let csv="Personel"+S+"Puan"+S+"Kilavuz Sayisi"+S+"Sure(dk)"+S+"Ders(dk)"+S+"Giris Sayisi"+S+"Son Oynama"+COURSES.map(c=>S+clean(c.title)+" Puan").join("")+"\n";
+  rows.forEach(r=>{csv+=[clean(r.n),r.total,r.done,Math.round((r.t||0)/60),Math.round((r.lt||0)/60),r.sc||0,(r.last?new Date(r.last).toLocaleDateString("tr-TR"):"")].join(S);COURSES.forEach(c=>{const cc=r.courses&&r.courses[c.id];csv+=S+(cc?cc.score:"");});csv+="\n";});
+  copyText(csv,"Tablo panoya kopyalandı. Excel'de bir hücreye tıklayıp yapıştır — sütunlara otomatik dağılır.");
 }
 
 /* =================== AYARLAR / MODAL =================== */
