@@ -306,7 +306,7 @@ async function syncUser(){
       const p=prof();
       const resets=remote["__resets"]||{}; const mr=resets[safeKey(user)];
       let justReset=false;
-      if(mr&&mr.t&&p.resetAck!==mr.t){ p.exam={}; p.firstDone={}; p.resetAck=mr.t; save(); justReset=true; }
+      if(mr&&mr.t&&p.resetAck!==mr.t){ p.exam={}; p.firstDone={}; p.err={}; p.stats={}; p.resetAck=mr.t; save(); justReset=true; }
       if(!justReset){
         const r=remote[safeKey(user)]||Object.values(remote).find(x=>x&&x.n===user);
         if(r&&r.courses){ p.exam=p.exam||{}; Object.keys(r.courses).forEach(cid=>{const rs=(r.courses[cid]&&r.courses[cid].score)||0; if(rs>(p.exam[cid]||0))p.exam[cid]=rs;}); }
@@ -686,7 +686,7 @@ async function mgrReset(enc){
   if(!confirm(name+" adlı oyuncunun puanları sıfırlansın mı?\n(Kopya çekenler için — oyuncu kalır, skorları sıfırlanır.)"))return;
   const url=backendURL();
   try{ if(url){ await fetch(url+"/scores/__resets/"+safeKey(name)+".json",{method:"PUT",body:JSON.stringify({t:Date.now()})}); await fetch(url+"/scores/"+safeKey(name)+".json",{method:"DELETE"}); } }catch(e){}
-  if(store.profiles[name]){ store.profiles[name].exam={}; store.profiles[name].firstDone={}; save(); }
+  if(store.profiles[name]){ store.profiles[name].exam={}; store.profiles[name].firstDone={}; store.profiles[name].err={}; store.profiles[name].stats={}; save(); }
   screenManager("Puanlar sıfırlandı: "+name);
 }
 async function mgrDelete(enc){
