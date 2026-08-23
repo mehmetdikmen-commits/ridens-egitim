@@ -312,12 +312,13 @@ async function syncUser(){
       const p=prof();
       const resets=remote["__resets"]||{}; const mr=resets[safeKey(user)];
       let justReset=false;
-      if(mr&&mr.t&&p.resetAck!==mr.t){ if(mr.mode==="err"){ p.err={}; }else{ p.exam={}; p.firstDone={}; p.err={}; p.stats={}; } p.resetAck=mr.t; save(); justReset=true; }
+      if(mr&&mr.t&&p.resetAck!==mr.t){ if(mr.mode==="err"){ p.err={}; }else{ p.exam={}; p.firstDone={}; p.err={}; p.stats={}; p.tele={}; } p.resetAck=mr.t; save(); justReset=true; }
       if(!justReset){
         const r=remote[safeKey(user)]||Object.values(remote).find(x=>x&&x.n===user);
         if(r&&r.courses){ p.exam=p.exam||{}; Object.keys(r.courses).forEach(cid=>{const rs=(r.courses[cid]&&r.courses[cid].score)||0; if(rs>(p.exam[cid]||0))p.exam[cid]=rs;}); }
       if(r){ p.stats=p.stats||{t:0,s:0,last:0}; if((r.t||0)>p.stats.t)p.stats.t=r.t; if((r.lt||0)>(p.stats.lt||0))p.stats.lt=r.lt; if((r.sc||0)>p.stats.s)p.stats.s=r.sc;
-        if(r.err){ p.err=p.err||{}; Object.keys(r.err).forEach(cid=>{ p.err[cid]=p.err[cid]||{}; Object.keys(r.err[cid]||{}).forEach(sk=>{ if((r.err[cid][sk]||0)>(p.err[cid][sk]||0)) p.err[cid][sk]=r.err[cid][sk]; }); }); } }
+        if(r.err){ p.err=p.err||{}; Object.keys(r.err).forEach(cid=>{ p.err[cid]=p.err[cid]||{}; Object.keys(r.err[cid]||{}).forEach(sk=>{ if((r.err[cid][sk]||0)>(p.err[cid][sk]||0)) p.err[cid][sk]=r.err[cid][sk]; }); }); }
+        if(r.tele){ p.tele=p.tele||{n:0,c:0,s:0,sl:0,ff:0,nl:0}; ["n","c","s","sl","ff","nl"].forEach(k2=>{ if((r.tele[k2]||0)>(p.tele[k2]||0)) p.tele[k2]=r.tele[k2]; }); } }
       save();
       }
     }
@@ -400,6 +401,7 @@ function block(b){
 function showLesson(){
   const S=sections(),L=S[readIdx];
   setHead(CC.title,L.title); inLesson=true;
+  try{const p=prof();p.lopen=p.lopen||{};p.lopen[CC.id]=1;save();}catch(e){}
   hud.innerHTML=`<button class="back" onclick="screenMap()">‹ Dersler</button>`;
   const figs=(window.FIGS&&window.FIGS[K(CC.id,L.key)])||[];
   const figHtml=figs.map(f=>`<figure class="lfig"><img src="${f.s}" alt="${f.c}" loading="lazy"><figcaption>${f.c}</figcaption></figure>`).join("");
@@ -449,6 +451,7 @@ function restartExam(){ clearRun(); startExam(false); }
 function startExam(resume){
   ex={secs:buildSections(), si:0, i:0, lives:LIVES, score:0, streak:0, timer:null, remain:Q_TIME, answered:false, late:false};
   if(resume){ const r=(prof().run||{})[CC.id]; if(r){ ex.si=Math.min(r.sec, ex.secs.length-1); ex.lives=r.lives; ex.score=r.score; } }
+  else{ try{const p=prof(); if(!(p.lopen&&p.lopen[CC.id])){ const t=p.tele=p.tele||{n:0,c:0,s:0,sl:0,ff:0,nl:0}; t.nl=(t.nl||0)+1; save(); } }catch(e){} }
   sectionIntro();
 }
 function secDots(){ return `<div class="secdots">`+ex.secs.map((s,idx)=> idx<ex.si?'🟢':(idx===ex.si?'🔵':'⚪')).join("")+`</div>`; }
@@ -484,7 +487,7 @@ function examRender(){
     <div id="opts">${q.opts.map((o,k)=>`<button class="opt" id="o${k}" onclick="examPick(${k})">${o}</button>`).join("")}</div>
     <div class="explain" id="exp"></div>
     <button class="btn" id="nx" disabled onclick="examNext()">Devam →</button></div>`;
-  ex.answered=false; ex.late=false; ex.remain=Q_TIME; startTimer(); window.scrollTo(0,0);
+  ex.answered=false; ex.late=false; ex.remain=Q_TIME; ex.qt=Date.now(); startTimer(); window.scrollTo(0,0);
 }
 function startTimer(){
   clearInterval(ex.timer);
@@ -500,6 +503,7 @@ function nextBtnLabel(){ const sec=ex.secs[ex.si]; if(ex.i+1<sec.pool.length) re
 function examPick(k){
   if(ex.answered)return; ex.answered=true; clearInterval(ex.timer);
   const q=ex.secs[ex.si].pool[ex.i]; disableOpts();
+  recTele(k===q.a, ex.qt?Math.min(120,(Date.now()-ex.qt)/1000):null);
   const cbtn=document.getElementById("o"+q.a); if(cbtn)cbtn.classList.add("correct");
   const exl=document.getElementById("exp");
   if(k===q.a && ex.late){
@@ -530,6 +534,13 @@ function examTimeout(){
   const bar=document.getElementById("tbar"); if(bar)bar.style.width="0%";
   const exl=document.getElementById("exp");
   if(exl){ exl.className="explain late show"; exl.innerHTML="⏱ Süre doldu — yine de cevaplayabilirsin, ama en fazla <b>+"+LATE_PTS+" puan</b> alırsın."; }
+}
+function recTele(ok,secs){
+  try{ if(secs==null)return; const p=prof();
+    const t=p.tele=p.tele||{n:0,c:0,s:0,sl:0,ff:0,nl:0};
+    t.n++; t.s=Math.round((t.s+secs)*10)/10;
+    if(ok){ t.c++; if(secs>=15)t.sl++; if(secs<=7)t.ff++; }
+    save(); }catch(e){}
 }
 function recErr(){
   try{ const p=prof(); p.err=p.err||{}; p.err[CC.id]=p.err[CC.id]||{};
@@ -611,7 +622,7 @@ function mySummary(name){
   const p=store.profiles[name]||{}; const exam=p.exam||{};
   const courses={}; let total=0, comp=0;
   COURSES.forEach(c=>{ const s=exam[c.id]; if(s!=null){courses[c.id]={score:s}; total+=s; comp++;} });
-  const st=(p.stats||{}); return {n:name,ts:Date.now(),total,done:comp,courses,t:st.t||0,lt:st.lt||0,sc:st.s||0,last:st.last||0,err:p.err||{}};
+  const st=(p.stats||{}); return {n:name,ts:Date.now(),total,done:comp,courses,t:st.t||0,lt:st.lt||0,sc:st.s||0,last:st.last||0,err:p.err||{},tele:p.tele||null};
 }
 async function pushMine(){
   const url=backendURL();if(!url||!user)return;
@@ -675,6 +686,7 @@ async function screenManager(msg){
   document.getElementById("mbody").innerHTML=`
     <div class="conn ${live?'on':'off'}">${live?'🟢 Canlı bağlantı açık.':'⚪ Canlı bağlantı yok.'}</div>
     ${topErrsHtml(rows)}
+    ${suspHtml(rows)}
     <div class="mwrap"><table class="mtable">${head}${body}</table></div>
     <div style="font-size:12px;color:var(--grey);margin:6px 0 2px">🧹 Sıfırla: kopya çekenin puanını siler (oyuncu kalır). 🗑️ Sil: oyuncuyu tamamen kaldırır. İkisi de canlı sıralamayı günceller.</div>
     <button class="btn secondary" onclick="screenManager()">↻ Yenile</button>
@@ -693,6 +705,20 @@ function showErrs(enc){
   const list=items.length?items.map(([t,n])=>`<div class="lbrow"><div class="nm">${t}</div><div class="sc">${n}<small>hata</small></div></div>`).join(""):"<p>Henüz hata kaydı yok. (Hata takibi bu güncellemeyle başladı.)</p>";
   showSheet(`<h3>📊 ${name} — Hata Dökümü</h3><p>Bölüm başına toplam yanlış cevap sayısı (en çoktan aza).</p>${list}<button class="btn secondary" onclick="closeSheet()">Kapat</button>`);
 }
+function suspHtml(rows){
+  const items=rows.filter(r=>r.tele&&r.tele.n>=12).map(r=>{
+    const t=r.tele, avg=t.s/t.n, err=1-(t.c/t.n), slr=t.c?t.sl/t.c:0;
+    const flags=[];
+    if(avg>=12&&err<=0.06)flags.push("çok yavaş ama neredeyse hatasız");
+    if(slr>=0.5&&err<=0.08)flags.push("doğru cevapların yarısından fazlası 15 sn üzeri");
+    if((t.nl||0)>=2)flags.push("derse hiç girmeden "+t.nl+" kez sınava girdi");
+    return {r:r,avg:avg,err:err,slr:slr,flags:flags};
+  }).sort((a,b)=>b.flags.length-a.flags.length||b.avg-a.avg);
+  if(!items.length) return `<div class="conn off">🕵️ Kopya analizi: henüz yeterli cevap verisi yok — yeni cevaplar toplandıkça burada görünecek.</div>`;
+  const lines=items.map(x=>`<tr><td><b>${x.r.n}</b></td><td>${x.avg.toFixed(1)} sn</td><td>%${Math.round(x.err*100)}</td><td>%${Math.round(x.slr*100)}</td><td>${x.r.tele.nl||0}</td><td>${x.flags.length?'🚩 '+x.flags.join(" · "):'✓ normal'}</td></tr>`).join("");
+  return `<div class="mwrap"><b style="font-size:13px">🕵️ Kopya şüphesi analizi</b><table class="mtable"><tr><th>Personel</th><th>Ort. cevap süresi</th><th>Hata oranı</th><th>Yavaş-doğru</th><th>Derssiz sınav</th><th>Durum</th></tr>${lines}</table>
+  <div style="font-size:12px;color:var(--grey);margin:4px 0 8px">Bilen kişi hızlı cevaplar (5–10 sn). Soruyu yapay zekâya çözdüren tipik olarak yavaştır (15+ sn) ve neredeyse hiç hata yapmaz. 🚩 kesin kanıt değildir; personelle konuşmadan karar vermeyin.</div></div>`;
+}
 function topErrsHtml(rows){
   const agg={};
   rows.forEach(r=>{const e=r.err||{};Object.keys(e).forEach(cid=>Object.keys(e[cid]||{}).forEach(sk=>{const k=cid+"::"+sk;agg[k]=(agg[k]||0)+(e[cid][sk]||0);}));});
@@ -705,7 +731,7 @@ async function mgrReset(enc){
   if(!confirm(name+" adlı oyuncunun puanları sıfırlansın mı?\n(Kopya çekenler için — oyuncu kalır, skorları sıfırlanır.)"))return;
   const url=backendURL();
   try{ if(url){ await fetch(url+"/scores/__resets/"+safeKey(name)+".json",{method:"PUT",body:JSON.stringify({t:Date.now()})}); await fetch(url+"/scores/"+safeKey(name)+".json",{method:"DELETE"}); } }catch(e){}
-  if(store.profiles[name]){ store.profiles[name].exam={}; store.profiles[name].firstDone={}; store.profiles[name].err={}; store.profiles[name].stats={}; save(); }
+  if(store.profiles[name]){ store.profiles[name].exam={}; store.profiles[name].firstDone={}; store.profiles[name].err={}; store.profiles[name].stats={}; store.profiles[name].tele={}; save(); }
   screenManager("Puanlar sıfırlandı: "+name);
 }
 async function mgrDelete(enc){
