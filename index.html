@@ -224,6 +224,12 @@
   .runinfo{background:var(--info-bg);color:var(--blue);border-radius:10px;padding:8px 12px;font-size:12.5px;text-align:center;margin-bottom:10px;font-weight:600}
 .cem img{width:100%;height:100%;object-fit:contain;border-radius:11px;background:#fff}
   .maphead .bigimg{position:absolute;right:6px;top:8px;width:64px;height:64px;object-fit:contain;opacity:.9;border-radius:10px;background:rgba(255,255,255,.85);padding:3px}
+#lb{position:fixed;inset:0;background:rgba(10,12,20,.94);display:none;z-index:9999;align-items:center;justify-content:center;flex-direction:column;padding:12px;cursor:zoom-out}
+#lb.show{display:flex}
+#lb img{max-width:97vw;max-height:86vh;width:auto;height:auto;border-radius:12px;background:#fff;padding:6px;box-sizing:border-box}
+#lb .lbc{color:#fff;margin-top:10px;font-size:14px;text-align:center;max-width:92vw}
+.card table img,figure.lfig img{cursor:zoom-in}
+.zoomhint{font-size:12px;color:#8b93a7;margin:4px 0 10px}
 </style>
 </head>
 <body>
@@ -388,7 +394,7 @@ function block(b){
   if(b.ul)return `<ul>${b.ul.map(x=>`<li>${x}</li>`).join("")}</ul>`;
   if(b.step)return `<div class="step"><div class="sn">•</div><div>${b.step}</div></div>`;
   if(b.alert)return `<div class="alert ${b.alert}"><b>${b.t}</b>${b.b}</div>`;
-  if(b.table){const[h,...r]=b.table;return `<table><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr>${r.map(row=>`<tr>${row.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</table>`;}
+  if(b.table){const[h,...r]=b.table;const t=`<table><tr>${h.map(x=>`<th>${x}</th>`).join("")}</tr>${r.map(row=>`<tr>${row.map(x=>`<td>${x}</td>`).join("")}</tr>`).join("")}</table>`;return t.includes("<img")?t+`<div class="zoomhint">🔍 Görsele dokununca büyür</div>`:t;}
   return "";
 }
 function showLesson(){
@@ -403,6 +409,19 @@ function showLesson(){
   window.scrollTo(0,0);
 }
 
+/* == Görsel büyütme (lightbox) == */
+(function(){
+  const lb=document.createElement("div");lb.id="lb";lb.innerHTML='<img alt=""><div class="lbc"></div>';document.body.appendChild(lb);
+  lb.addEventListener("click",()=>lb.classList.remove("show"));
+  document.addEventListener("click",e=>{
+    const im=e.target.closest(".card table img, figure.lfig img");
+    if(!im)return;
+    lb.querySelector("img").src=im.src;
+    const fig=im.closest("figure");
+    lb.querySelector(".lbc").textContent=im.alt||(fig&&fig.querySelector("figcaption")?fig.querySelector("figcaption").textContent:"");
+    lb.classList.add("show");
+  });
+})();
 /* =================== SES & KUTLAMA =================== */
 let actx=null;
 function audio(){ if(store.mute)return null; try{ actx=actx||new (window.AudioContext||window.webkitAudioContext)(); if(actx.state==="suspended")actx.resume(); return actx; }catch(e){ return null; } }
