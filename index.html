@@ -632,9 +632,78 @@ function mySummary(name){
   COURSES.forEach(c=>{ const s=exam[c.id]; if(s!=null){courses[c.id]={score:s}; total+=s; comp++;} });
   const st=(p.stats||{}); return {n:name,ts:Date.now(),total,done:comp,courses,t:st.t||0,lt:st.lt||0,sc:st.s||0,last:st.last||0,err:p.err||{},tele:p.tele||null};
 }
+/* ---- Ay sonu (TR saatiyle gece yarısı) anlık görüntü ---- */
+const TR_OFF=3*3600e3, SNAP_FROM="2026-10";
+function trMonthKey(ts){const d=new Date(ts+TR_OFF);return d.getUTCFullYear()+"-"+String(d.getUTCMonth()+1).padStart(2,"0");}
+function trMonthStart(ts){const d=new Date(ts+TR_OFF);return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),1)-TR_OFF;}
+function trMonthEnd(key){const [y,m]=key.split("-").map(Number);return Date.UTC(y,m,1)-TR_OFF;}
+function monthLabel(key){const [y,m]=key.split("-").map(Number);return ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"][m-1]+" "+y;}
+const __snapChecked={};
+/* Kayıt yeni ayda ilk kez değişmeden önce, önceki ayın son hâlini __snaps altına saklar.
+   Böylece her ayın son gece yarısındaki (TR) puanlar kesin olarak korunur. */
+async function snapBeforeWrite(name){
+  const url=backendURL();if(!url||!name)return;
+  const now=Date.now(), ck=name+"|"+trMonthKey(now); if(__snapChecked[ck])return;
+  try{
+    const r=await fetch(url+"/scores/"+safeKey(name)+".json"); if(!r.ok)return;
+    const rec=await r.json();
+    if(rec&&rec.n&&(rec.ts||0)<trMonthStart(now)){
+      const k=trMonthKey(rec.ts||0);
+      const w=await fetch(url+"/scores/__snaps/"+safeKey(name)+"/"+k+".json",{method:"PUT",body:JSON.stringify(rec)});
+      if(!w.ok)return;
+    }
+    __snapChecked[ck]=1;
+  }catch(e){}
+}
 async function pushMine(){
   const url=backendURL();if(!url||!user)return;
+  await snapBeforeWrite(user);
   try{await fetch(url+"/scores/"+safeKey(user)+".json",{method:"PUT",body:JSON.stringify(mySummary(user))});}catch(e){}
+}
+/* Verilen ayın sonundaki (TR 00:00) sıralama: her kişi için ts ≤ ay sonu olan en son kayıt */
+function monthEndRows(remote,key){
+  if(!remote||typeof remote!=="object")return [];
+  const end=trMonthEnd(key), snaps=remote.__snaps||{}, resets=remote.__resets||{}, out=[];
+  const names=new Set();
+  Object.keys(remote).forEach(k=>{if(!k.startsWith("__")&&remote[k]&&remote[k].n)names.add(k);});
+  Object.keys(snaps).forEach(k=>names.add(k));
+  names.forEach(k=>{
+    const cands=[];
+    if(remote[k]&&remote[k].n)cands.push(remote[k]);
+    Object.values(snaps[k]||{}).forEach(v=>{if(v&&v.n)cands.push(v);});
+    const rt=(resets[k]&&resets[k].t)||0;
+    const best=cands.filter(c=>(c.ts||0)<end&&!(rt&&rt<end&&(c.ts||0)<rt)).sort((a,b)=>(b.ts||0)-(a.ts||0))[0];
+    if(best&&best.total>0)out.push(best);
+  });
+  return out.sort((a,b)=>(b.total-a.total)||(b.done-a.done)||a.n.localeCompare(b.n));
+}
+function closedMonths(){
+  const res=[], cur=trMonthKey(Date.now()); let k=SNAP_FROM;
+  while(k<cur){res.unshift(k);let [y,m]=k.split("-").map(Number);m++;if(m>12){m=1;y++;}k=y+"-"+String(m).padStart(2,"0");}
+  return res;
+}
+async function screenMonthly(sel){
+  setHead("📅 Ay Sonu Sıralaması",backendURL()?"Canlı":"Yerel");
+  hud.innerHTML=`<button class="back" onclick="screenLeaderboard()">‹ Geri</button>`;
+  const months=closedMonths();
+  if(!months.length){
+    app.innerHTML=`<div class="lbhead"><div class="big">📅</div><h2>Ay Sonu Sıralaması</h2><p>Her ayın son gece yarısındaki (TR saati) kesin sıralama.</p></div>
+      <div class="draft">İlk kayıt <b>31 Ekim 2026 gece yarısı</b> alınacak. Kasım başında burada <b>Ekim 2026</b> birincisini göreceksin.</div>
+      <button class="btn secondary" onclick="screenLeaderboard()">‹ Sıralamaya dön</button>`;
+    window.scrollTo(0,0);return;
+  }
+  const key=sel&&months.includes(sel)?sel:months[0];
+  app.innerHTML=`<div class="lbhead"><div class="big">📅</div><h2>Ay Sonu Sıralaması</h2><p>Yükleniyor…</p></div>`;
+  const remote=await fetchRemote(), rows=monthEndRows(remote,key), medals=["🥇","🥈","🥉"];
+  const tabs=months.map(m=>`<button class="mini" style="${m===key?'background:var(--teal);color:#fff':''}" onclick="screenMonthly('${m}')">${monthLabel(m)}</button>`).join(" ");
+  const list=rows.length?rows.map((r,i)=>`<div class="lbrow ${r.n===user?'me':''}"><div class="rk">${i<3?medals[i]:(i+1)}</div><div class="av">${initials(r.n)}</div>
+      <div class="nm">${r.n}<small>${r.done} kılavuz tamamlandı</small></div><div class="sc">${r.total}<small>puan</small></div></div>`).join(""):
+    `<div class="draft">Bu ay için kayıt yok.</div>`;
+  app.innerHTML=`<div class="lbhead"><div class="big">📅</div><h2>${monthLabel(key)} — Ay Sonu</h2>
+      <p>${rows[0]?'🏆 Ayın birincisi: <b>'+rows[0].n+'</b> · ':''}Ay bitimi gece yarısındaki (TR saati) kesin puanlar.</p></div>
+    <div style="margin:8px 0">${tabs}</div>${list}
+    <button class="btn secondary" onclick="screenLeaderboard()">‹ Canlı sıralamaya dön</button>`;
+  window.scrollTo(0,0);
 }
 async function fetchRemote(){
   const url=backendURL();if(!url)return null;
@@ -666,7 +735,8 @@ async function screenLeaderboard(){
       <p>En yüksek puan başta. Ödül birincinin! 🎁</p></div>
     <div class="conn ${live?'on':'off'}">${live?'🟢 Canlı bağlantı açık — herkesin puanı burada.':'⚪ Canlı bağlantı yok — sadece bu cihaz.'}</div>
     ${list}
-    <button class="btn secondary" onclick="screenLeaderboard()">↻ Yenile</button>`;
+    <button class="btn secondary" onclick="screenLeaderboard()">↻ Yenile</button>
+    <button class="btn secondary" onclick="screenMonthly()">📅 Ay sonu sıralamaları</button>`;
   window.scrollTo(0,0);
 }
 
@@ -739,6 +809,7 @@ async function mgrReset(enc){
   const name=decodeURIComponent(enc);
   if(!confirm(name+" adlı oyuncunun puanları sıfırlansın mı?\n(Kopya çekenler için — oyuncu kalır, skorları sıfırlanır.)"))return;
   const url=backendURL();
+  await snapBeforeWrite(name);
   try{ if(url){ await fetch(url+"/scores/__resets/"+safeKey(name)+".json",{method:"PUT",body:JSON.stringify({t:Date.now()})}); await fetch(url+"/scores/"+safeKey(name)+".json",{method:"DELETE"}); } }catch(e){}
   if(store.profiles[name]){ store.profiles[name].exam={}; store.profiles[name].firstDone={}; store.profiles[name].err={}; store.profiles[name].stats={}; store.profiles[name].tele={}; save(); }
   screenManager("Puanlar sıfırlandı: "+name);
@@ -747,6 +818,7 @@ async function mgrDelete(enc){
   const name=decodeURIComponent(enc);
   if(!confirm(name+" adlı oyuncu tamamen silinsin mi?\n(Yanlış/başka bir oyuncuysa kaldırır.)"))return;
   const url=backendURL();
+  await snapBeforeWrite(name);
   try{ if(url){ await fetch(url+"/scores/__resets/"+safeKey(name)+".json",{method:"PUT",body:JSON.stringify({t:Date.now()})}); await fetch(url+"/scores/"+safeKey(name)+".json",{method:"DELETE"}); } }catch(e){}
   if(store.profiles[name]){ delete store.profiles[name]; if(store.last===name)store.last=null; save(); }
   screenManager("Oyuncu silindi: "+name);
