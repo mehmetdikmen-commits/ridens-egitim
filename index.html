@@ -286,13 +286,13 @@ function screenProfiles(){
       <div class="pp">🏅 ${totalScore(n)} puan • ${completedCount(n)} kılavuz</div></div>
       <button class="del" onclick="event.stopPropagation();delProf('${encodeURIComponent(n)}')">🗑️</button>
     </div>`).join("");
-  app.innerHTML=`<div class="center"><div class="mascot">🦷</div>
+  app.innerHTML=`<div id="wbSlot"></div><div class="center"><div class="mascot">🦷</div>
     <h2>Kim oynuyor?</h2>
     <p>İsmini seç ya da yeni personel ekle. İlerlemen kaydedilir.</p>
     ${names.length?`<div class="plist">${list}</div>`:`<div class="draft">Henüz personel yok. Aşağıdan ekle 👇</div>`}
     <input class="name" id="newName" placeholder="Yeni personel adı" maxlength="24" onkeydown="if(event.key==='Enter')addProf()">
     <button class="btn" onclick="addProf()">+ Personel ekle ve başla</button></div>`;
-  window.scrollTo(0,0);
+  window.scrollTo(0,0); showWinnerBanner();
 }
 function addProf(){const el=document.getElementById("newName");const n=(el.value||"").trim();if(!n)return;
   if(!store.profiles[n])store.profiles[n]={exam:{}};store.last=n;save();pick(encodeURIComponent(n));}
@@ -347,9 +347,9 @@ function screenCourses(){
       <div class="cem">${c.icon?`<img src="${c.icon}" alt="">`:c.emoji}</div>
       <div style="flex:1"><h3>${c.title}</h3><p>${c.desc}</p>
       <div class="row">${badge}${scoreBadge}</div></div></div>`;}).join("");
-  app.innerHTML=`<p class="pp" style="color:var(--grey);font-size:14px;margin:0 0 14px">Bir kılavuz seç: dersleri oku, sonra teste gir.</p>${cards}
+  app.innerHTML=`<div id="wbSlot"></div><p class="pp" style="color:var(--grey);font-size:14px;margin:0 0 14px">Bir kılavuz seç: dersleri oku, sonra teste gir.</p>${cards}
     <button class="btn secondary" onclick="screenLeaderboard()">🏅 Sıralamayı gör</button>`;
-  window.scrollTo(0,0);
+  window.scrollTo(0,0); showWinnerBanner();
 }
 function openCourse(id){CC=COURSES.find(c=>c.id===id);screenMap();}
 
@@ -639,6 +639,17 @@ function trMonthStart(ts){const d=new Date(ts+TR_OFF);return Date.UTC(d.getUTCFu
 function trMonthEnd(key){const [y,m]=key.split("-").map(Number);return Date.UTC(y,m,1)-TR_OFF;}
 function monthLabel(key){const [y,m]=key.split("-").map(Number);return ["Ocak","Şubat","Mart","Nisan","Mayıs","Haziran","Temmuz","Ağustos","Eylül","Ekim","Kasım","Aralık"][m-1]+" "+y;}
 const __snapChecked={};
+/* Sistem kaydı başlamadan önceki aylar — yönetici tarafından elle girildi */
+const PAST_WINNERS={"2026-08":"Merve","2026-09":"Gamze Nurr"};
+function prevMonthKey(){return trMonthKey(trMonthStart(Date.now())-1);}
+function winnerFor(key,remote){if(PAST_WINNERS[key])return PAST_WINNERS[key];if(key<SNAP_FROM)return null;const r=monthEndRows(remote,key);return r[0]?r[0].n:null;}
+async function showWinnerBanner(){
+  const day=new Date(Date.now()+TR_OFF).getUTCDate(); if(day>7)return;
+  const key=prevMonthKey(); let name=PAST_WINNERS[key]||null;
+  if(!name&&key>=SNAP_FROM){const remote=await fetchRemote();name=winnerFor(key,remote);}
+  const slot=document.getElementById("wbSlot"); if(!name||!slot)return;
+  slot.innerHTML=`<div onclick="screenMonthly('${key}')" style="cursor:pointer;background:linear-gradient(135deg,#b8860b,var(--gold));color:#fff;border-radius:14px;padding:12px 14px;margin:0 0 14px;text-align:center;font-size:15px;box-shadow:0 4px 14px rgba(184,134,11,.25)">🏆 <b>${monthLabel(key)}</b> birincisi: <b style="font-size:17px">${name}</b> — tebrikler! 🎉<div style="font-size:12px;opacity:.92;margin-top:3px">Ödül seçimi: 🏖️ İdari izin · 💰 Prim · 🍽️ Müfredat’ta yemek</div></div>`;
+}
 /* Kayıt yeni ayda ilk kez değişmeden önce, önceki ayın son hâlini __snaps altına saklar.
    Böylece her ayın son gece yarısındaki (TR) puanlar kesin olarak korunur. */
 async function snapBeforeWrite(name){
@@ -685,23 +696,27 @@ function closedMonths(){
 async function screenMonthly(sel){
   setHead("📅 Ay Sonu Sıralaması",backendURL()?"Canlı":"Yerel");
   hud.innerHTML=`<button class="back" onclick="screenLeaderboard()">‹ Geri</button>`;
-  const months=closedMonths();
+  const cur=trMonthKey(Date.now());
+  const months=[...new Set([...Object.keys(PAST_WINNERS).filter(k=>k<cur),...closedMonths()])].sort().reverse();
   if(!months.length){
     app.innerHTML=`<div class="lbhead"><div class="big">📅</div><h2>Ay Sonu Sıralaması</h2><p>Her ayın son gece yarısındaki (TR saati) kesin sıralama.</p></div>
-      <div class="draft">İlk kayıt <b>31 Ekim 2026 gece yarısı</b> alınacak. Kasım başında burada <b>Ekim 2026</b> birincisini göreceksin.</div>
+      <div class="draft">İlk kayıt ay sonunda gece yarısı alınacak.</div>
       <button class="btn secondary" onclick="screenLeaderboard()">‹ Sıralamaya dön</button>`;
     window.scrollTo(0,0);return;
   }
   const key=sel&&months.includes(sel)?sel:months[0];
   app.innerHTML=`<div class="lbhead"><div class="big">📅</div><h2>Ay Sonu Sıralaması</h2><p>Yükleniyor…</p></div>`;
-  const remote=await fetchRemote(), rows=monthEndRows(remote,key), medals=["🥇","🥈","🥉"];
+  const remote=await fetchRemote(), medals=["🥇","🥈","🥉"];
+  const manual=key<SNAP_FROM, rows=manual?[]:monthEndRows(remote,key), winner=winnerFor(key,remote);
   const tabs=months.map(m=>`<button class="mini" style="${m===key?'background:var(--teal);color:#fff':''}" onclick="screenMonthly('${m}')">${monthLabel(m)}</button>`).join(" ");
-  const list=rows.length?rows.map((r,i)=>`<div class="lbrow ${r.n===user?'me':''}"><div class="rk">${i<3?medals[i]:(i+1)}</div><div class="av">${initials(r.n)}</div>
-      <div class="nm">${r.n}<small>${r.done} kılavuz tamamlandı</small></div><div class="sc">${r.total}<small>puan</small></div></div>`).join(""):
-    `<div class="draft">Bu ay için kayıt yok.</div>`;
+  const list=manual?`<div class="draft">Bu ay sistemde ay sonu kaydı başlamadan önceydi; birinci yönetici kaydına göre yazıldı. Ayrıntılı sıralama yok.</div>`:
+    (rows.length?rows.map((r,i)=>`<div class="lbrow ${r.n===user?'me':''}"><div class="rk">${i<3?medals[i]:(i+1)}</div><div class="av">${initials(r.n)}</div>
+      <div class="nm">${r.n}<small>${r.done} kılavuz tamamlandı</small></div><div class="sc">${r.total}<small>puan</small></div></div>`).join(""):`<div class="draft">Bu ay için kayıt yok.</div>`);
+  const champs=months.map(m=>[m,winnerFor(m,remote)]).filter(x=>x[1]).map(([m,n])=>`<div class="lbrow" style="cursor:pointer" onclick="screenMonthly('${m}')"><div class="rk">🏆</div><div class="av">${initials(n)}</div><div class="nm">${n}<small>${monthLabel(m)}</small></div></div>`).join("");
   app.innerHTML=`<div class="lbhead"><div class="big">📅</div><h2>${monthLabel(key)} — Ay Sonu</h2>
-      <p>${rows[0]?'🏆 Ayın birincisi: <b>'+rows[0].n+'</b> — ödül seçimi: 🏖️ İdari izin · 💰 Prim · 🍽️ Müfredat’ta yemek<br>':''}Ay bitimi gece yarısındaki (TR saati) kesin puanlar.</p></div>
+      <p>${winner?'🏆 Ayın birincisi: <b>'+winner+'</b> — ödül seçimi: 🏖️ İdari izin · 💰 Prim · 🍽️ Müfredat’ta yemek<br>':''}${manual?'Yönetici kaydı.':'Ay bitimi gece yarısındaki (TR saati) kesin puanlar.'}</p></div>
     <div style="margin:8px 0">${tabs}</div>${list}
+    ${champs?`<h3 style="margin:18px 0 8px">🏅 Ayın Birincileri</h3>${champs}`:''}
     <button class="btn secondary" onclick="screenLeaderboard()">‹ Canlı sıralamaya dön</button>`;
   window.scrollTo(0,0);
 }
