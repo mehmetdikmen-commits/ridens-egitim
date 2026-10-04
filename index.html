@@ -700,7 +700,7 @@ async function screenMonthly(sel){
       <div class="nm">${r.n}<small>${r.done} kılavuz tamamlandı</small></div><div class="sc">${r.total}<small>puan</small></div></div>`).join(""):
     `<div class="draft">Bu ay için kayıt yok.</div>`;
   app.innerHTML=`<div class="lbhead"><div class="big">📅</div><h2>${monthLabel(key)} — Ay Sonu</h2>
-      <p>${rows[0]?'🏆 Ayın birincisi: <b>'+rows[0].n+'</b> — ödül seçimi: 🏖️ İdari izin · 💰 Prim · 🍽️ Yemek<br>':''}Ay bitimi gece yarısındaki (TR saati) kesin puanlar.</p></div>
+      <p>${rows[0]?'🏆 Ayın birincisi: <b>'+rows[0].n+'</b> — ödül seçimi: 🏖️ İdari izin · 💰 Prim · 🍽️ Müfredat'ta yemek<br>':''}Ay bitimi gece yarısındaki (TR saati) kesin puanlar.</p></div>
     <div style="margin:8px 0">${tabs}</div>${list}
     <button class="btn secondary" onclick="screenLeaderboard()">‹ Canlı sıralamaya dön</button>`;
   window.scrollTo(0,0);
@@ -732,7 +732,7 @@ async function screenLeaderboard(){
       <div class="sc">${r.total}<small>puan</small></div></div>`;}).join(""):
     `<div class="draft">Henüz sonuç yok. İlk testi tamamlayan sıralamaya girer!</div>`;
   app.innerHTML=`<div class="lbhead"><div class="big">🏆</div><h2>Sıralama</h2>
-      <p>En yüksek puan başta. Ayın birincisi ödülünü seçer: 🏖️ İdari izin · 💰 Prim · 🍽️ Yemek</p></div>
+      <p>En yüksek puan başta. Ayın birincisi ödülünü seçer: 🏖️ İdari izin · 💰 Prim · 🍽️ Müfredat'ta yemek</p></div>
     <div class="conn ${live?'on':'off'}">${live?'🟢 Canlı bağlantı açık — herkesin puanı burada.':'⚪ Canlı bağlantı yok — sadece bu cihaz.'}</div>
     ${list}
     <button class="btn secondary" onclick="screenLeaderboard()">↻ Yenile</button>
