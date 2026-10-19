@@ -286,7 +286,7 @@ function save(){ try{ localStorage.setItem("ridens_game3",JSON.stringify(store))
 let user=null, CC=null;
 const app=document.getElementById("app"), hud=document.getElementById("hud");
 
-const LIVES=3, Q_TIME=20, BASE_PTS=10, LIFE_BONUS=25, FINISH_BONUS=50, EXAM_LEN=15, WRONG_PENALTY=5, FIRST_BONUS=100, SEC_Q=4, LATE_PTS=3;
+const LIVES=3, Q_TIME=25, BASE_PTS=10, LIFE_BONUS=25, FINISH_BONUS=50, EXAM_LEN=15, WRONG_PENALTY=5, FIRST_BONUS=100, SEC_Q=4, LATE_PTS=3;
 
 function initials(n){return n.trim().split(/\s+/).map(w=>w[0]).slice(0,2).join("").toUpperCase();}
 function K(cid,lk){return cid+"::"+lk;}
@@ -572,14 +572,14 @@ function examRender(){
     :`<div id="opts">${q.opts.map((o,k)=>`<button class="opt" id="o${k}" onclick="examPick(${k})">${o}</button>`).join("")}</div>`}
     <div class="explain" id="exp"></div>
     <button class="btn" id="nx" disabled onclick="examNext()">Devam →</button></div>`;
-  ex.answered=false; ex.late=false; ex.remain=(ex.qtime||Q_TIME); ex.ordNext=0; ex.mtSel=null; ex.mtDone=0; if(!ex._simHold)ex.simStep=0; ex._simHold=false; ex.qt=Date.now(); startTimer(); window.scrollTo(0,0);
+  ex.answered=false; ex.late=false; ex.curT=(q.ord||q.mt||q.sim)?Math.round((ex.qtime||Q_TIME)*1.6):((q.hs||q.img)?Math.round((ex.qtime||Q_TIME)*1.2):(ex.qtime||Q_TIME)); ex.remain=ex.curT; ex.ordNext=0; ex.mtSel=null; ex.mtDone=0; if(!ex._simHold)ex.simStep=0; ex._simHold=false; ex.qt=Date.now(); startTimer(); window.scrollTo(0,0);
 }
 function startTimer(){
   clearInterval(ex.timer);
   ex.timer=setInterval(()=>{
     ex.remain-=0.1;
     const bar=document.getElementById("tbar");
-    if(bar) bar.style.width=Math.max(0,ex.remain/(ex.qtime||Q_TIME)*100)+"%";
+    if(bar) bar.style.width=Math.max(0,ex.remain/(ex.curT||Q_TIME)*100)+"%";
     if(ex.remain<=0){ clearInterval(ex.timer); examTimeout(); }
   },100);
 }
@@ -593,7 +593,7 @@ function qdone(ok,extraEx){
   recTele(ok, ex.qt?Math.min(120,(Date.now()-ex.qt)/1000):null);
   const exl=document.getElementById("exp");
   if(ok&&ex.late){ ex.streak=0; ex.score+=LATE_PTS; sndCorrect(); exl.className="explain ok show"; exl.innerHTML=`✓ Doğru (süre doldu) <b>+${LATE_PTS} puan</b><br>${q.ex}`; updHud(); afterAnswer(); }
-  else if(ok){ ex.streak++; const speed=Math.round(Math.max(0,ex.remain)/(ex.qtime||Q_TIME)*BASE_PTS); const sb=Math.min(ex.streak,5)*2; const g=BASE_PTS+speed+sb; ex.score+=g; sndCorrect(); exl.className="explain ok show"; exl.innerHTML=`✓ Doğru! <b>+${g} puan</b> <small>(temel ${BASE_PTS} · hız ${speed} · seri ${sb})</small><br>${q.ex}`; updHud(); afterAnswer(); }
+  else if(ok){ ex.streak++; const speed=Math.round(Math.max(0,ex.remain)/(ex.curT||Q_TIME)*BASE_PTS); const sb=Math.min(ex.streak,5)*2; const g=BASE_PTS+speed+sb; ex.score+=g; sndCorrect(); exl.className="explain ok show"; exl.innerHTML=`✓ Doğru! <b>+${g} puan</b> <small>(temel ${BASE_PTS} · hız ${speed} · seri ${sb})</small><br>${q.ex}`; updHud(); afterAnswer(); }
   else { sndWrong(); recErr(); loseLife("✗ Yanlış! <b>−"+WRONG_PENALTY+" puan</b><br>"+(extraEx||q.ex)); }
 }
 function ordPick(di){
@@ -647,7 +647,7 @@ function hsPick(zi){
     updHud(); afterAnswer();
   } else if(zi===q.ok){
     ex.streak++;
-    const speed=Math.round(Math.max(0,ex.remain)/Q_TIME*BASE_PTS);
+    const speed=Math.round(Math.max(0,ex.remain)/(ex.curT||Q_TIME)*BASE_PTS);
     const sb=Math.min(ex.streak,5)*2;
     const g=BASE_PTS+speed+sb; ex.score+=g;
     sndCorrect();
@@ -675,7 +675,7 @@ function examPick(k){
     updHud(); afterAnswer();
   } else if(k===q.a){
     ex.streak++;
-    const speed=Math.round(Math.max(0,ex.remain)/Q_TIME*BASE_PTS);
+    const speed=Math.round(Math.max(0,ex.remain)/(ex.curT||Q_TIME)*BASE_PTS);
     const sb=Math.min(ex.streak,5)*2;
     const g=BASE_PTS+speed+sb; ex.score+=g;
     sndCorrect();
