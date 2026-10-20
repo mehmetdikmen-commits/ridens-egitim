@@ -261,6 +261,13 @@
 .modecard p{margin:2px 0 0;font-size:12.5px;opacity:.85}
 .modecard .mb{margin-left:auto;background:rgba(255,255,255,.18);border-radius:8px;padding:4px 9px;font-size:12px;white-space:nowrap}
 .vqbox{background:#f1f5f9;border:1.5px solid #cbd5e1;border-radius:12px;padding:12px;margin:8px 0}
+.gemwrap{display:flex;justify-content:center;margin:14px 0}
+.gembtn{font-size:40px;background:radial-gradient(circle,#e0f2fe,#bae6fd);border:2px solid #38bdf8;border-radius:50%;width:76px;height:76px;cursor:pointer;animation:gempulse 1.4s infinite}
+@keyframes gempulse{0%,100%{transform:scale(1)}50%{transform:scale(1.12)}}
+.goldq{display:inline-block;background:linear-gradient(135deg,#f59e0b,#fbbf24);color:#422006;font-weight:800;border-radius:8px;padding:3px 10px;font-size:12.5px;margin-bottom:6px}
+.firsat{position:absolute;top:8px;right:8px;background:linear-gradient(135deg,#dc2626,#f97316);color:#fff;font-size:11px;font-weight:800;border-radius:8px;padding:3px 8px}
+.duyuru{background:linear-gradient(135deg,#065f46,#0d9488);color:#fff;border-radius:14px;padding:14px;margin:0 0 12px;font-size:13.5px;line-height:1.5}
+.duyuru b{font-size:15px}
 </style>
 </head>
 <body>
@@ -366,15 +373,18 @@ function screenCourses(){
     const bs=bestScore(user,c.id);
     const badge=c.ready?`<span class="badge ready">Hazır</span>`:`<span class="badge draft">Taslak</span>`;
     const scoreBadge=bs!=null?`<span class="badge stars">🏅 En iyi: ${bs}p</span>`:`<span class="badge stars">Hiç test olmadın</span>`;
-    return `<div class="course" onclick="openCourse('${c.id}')">
+    const fr=c.id===window.__firsat?`<div class="firsat">🔥 Bugün ×1,5</div>`:``;
+    return `<div class="course" style="position:relative" onclick="openCourse('${c.id}')">${fr}
       <div class="cem">${c.icon?`<img src="${c.icon}" alt="">`:c.emoji}</div>
       <div style="flex:1"><h3>${c.title}</h3><p>${c.desc}</p>
       <div class="row">${badge}${scoreBadge}</div></div></div>`;}).join("");
+  window.__firsat=firsatCourse();
+  const duyuru=store.seenSurpriz?``:`<div class="duyuru"><b>🎉 YENİ: Sürpriz Puanlar!</b><br>💎 <b>Ders Elması:</b> her gün 3 derste gizli elmas — dersi okurken bul, +15 puan!<br>🔥 <b>Günün Fırsat Kursu:</b> kartında 🔥 olan kursu bugün bitir, puanın ×1,5!<br>⭐ <b>Altın Soru:</b> her testte bir soru altındır — doğru bilene +20.<br><button class="btn" style="margin-top:8px" onclick="store.seenSurpriz=1;save();screenCourses()">Anladım 👍</button></div>`;
   const p0=prof()||{}; const dBadge=dailyDoneToday()?"✓ Bugün tamam · 🔥 "+((p0.daily&&p0.daily.streak)||1):"🎯 Oyna";
   const sBadge="Rekor: "+((p0.surv&&p0.surv.best)||0);
   const modeCards=`<div class="modecard" onclick="startDaily()"><div class="me">📅</div><div><h3>Günün 5 Sorusu</h3><p>Her gün 5 karışık soru · seri bonusu</p></div><div class="mb">${dBadge}</div></div>
   <div class="modecard" style="background:linear-gradient(135deg,#7c2d12,#b45309)" onclick="startSurvival()"><div class="me">🔥</div><div><h3>Hayatta Kalma</h3><p>Tek can · süre gittikçe kısalır</p></div><div class="mb">${sBadge}</div></div>`;
-  app.innerHTML=`<div id="wbSlot"></div>${modeCards}<p class="pp" style="color:var(--grey);font-size:14px;margin:0 0 14px">Bir kılavuz seç: dersleri oku, sonra teste gir.</p>${cards}
+  app.innerHTML=`<div id="wbSlot"></div>${duyuru}${modeCards}<p class="pp" style="color:var(--grey);font-size:14px;margin:0 0 14px">Bir kılavuz seç: dersleri oku, sonra teste gir.</p>${cards}
     <button class="btn secondary" onclick="screenLeaderboard()">🏅 Sıralamayı gör</button>`;
   window.scrollTo(0,0); showWinnerBanner();
 }
@@ -444,7 +454,8 @@ function showLesson(){
   const figHtml=figs.map(f=>`<figure class="lfig"><img src="${f.s}" alt="${f.c}" loading="lazy"><figcaption>${f.c}</figcaption></figure>`).join("");
   const next=readIdx<S.length-1?`<button class="btn green" onclick="readLesson(${readIdx+1})">Sonraki ders →</button>`:`<button class="btn green" onclick="startExam()">🏆 Teste gir</button>`;
   const prev=readIdx>0?`<button class="btn secondary" onclick="readLesson(${readIdx-1})">‹ Önceki ders</button>`:`<button class="btn secondary" onclick="screenMap()">‹ Derslere dön</button>`;
-  app.innerHTML=`<div class="card"><h2>${L.emoji} ${L.lesson.h}</h2>${L.lesson.blocks.map(block).join("")}${figHtml}</div>${next}${prev}`;
+  const gemHtml=gemHere()?`<div class="gemwrap" id="gemw"><button class="gembtn" onclick="gemPick()" title="Sürpriz!">💎</button></div>`:``;
+  app.innerHTML=`<div class="card"><h2>${L.emoji} ${L.lesson.h}</h2>${L.lesson.blocks.map(block).join("")}${gemHtml}${figHtml}</div>${next}${prev}`;
   window.scrollTo(0,0);
 }
 
@@ -477,10 +488,12 @@ const MOTIVE=["Harika gidiyorsun! 💪","Bir bölüm daha cebinde! 🎯","Ustala
 let ex=null;
 function shuffle(a){for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];}return a;}
 function buildSections(){
-  return sections().map(l=>{
-    const pool=shuffle(l.q.slice()).slice(0,SEC_Q).map(q=>{ if(q.hs||q.ord||q.mt||q.sim)return q; const idx=shuffle(q.opts.map((_,i)=>i)); const o={q:q.q,opts:idx.map(i=>q.opts[i]),a:idx.indexOf(q.a),ex:q.ex}; if(q.img)o.img=q.img; return o; });
+  const secs=sections().map(l=>{
+    const pool=shuffle(l.q.slice()).slice(0,SEC_Q).map(q=>{ if(q.hs||q.ord||q.mt||q.sim)return Object.assign({},q); const idx=shuffle(q.opts.map((_,i)=>i)); const o={q:q.q,opts:idx.map(i=>q.opts[i]),a:idx.indexOf(q.a),ex:q.ex}; if(q.img)o.img=q.img; return o; });
     return {key:l.key,title:l.title,emoji:l.emoji,pool};
   });
+  try{ const si=Math.floor(Math.random()*secs.length); const sec=secs[si]; if(sec.pool.length){ sec.pool[Math.floor(Math.random()*sec.pool.length)].gold=true; } }catch(e){}
+  return secs;
 }
 function saveRun(){ if(ex&&ex.mode)return; const p=prof(); p.run=p.run||{}; p.run[CC.id]={sec:ex.si,lives:ex.lives,score:ex.score}; save(); }
 function clearRun(){ const p=prof(); if(p.run){ delete p.run[CC.id]; save(); } }
@@ -526,6 +539,28 @@ function survEnd(){
   app.innerHTML=`<div class="result"><div class="big">🔥</div><h2>${run} soru dayandın!</h2><div class="rs">${isBest?"🏆 YENİ REKOR!":"Rekorun: "+(p.surv.best||0)+" soru"}</div><p>Hayatta Kalma puanın: rekor × 4 = <b>${(p.surv.best||0)*4}p</b> (toplam puanına dahil)</p><button class="btn green" onclick="startSurvival()">Tekrar dene</button><button class="btn secondary" onclick="screenCourses()">Kurslara dön</button></div>`;
   window.scrollTo(0,0);
 }
+/* === Sürpriz puanlar === */
+function surPlus(n){ const p=prof(); p.exam=p.exam||{}; p.exam["surpriz"]=(p.exam["surpriz"]||0)+n; save(); pushMine(); }
+function todayGems(){ // bugünün 3 elması: [cid+"|"+levelIdx]
+  const all=[];
+  COURSES.filter(c=>!c.retired).forEach(c=>{ c.levels.forEach((l,i)=>{ if(!l.boss&&l.lesson) all.push(c.id+"|"+i); }); });
+  return seededShuffle(all,todayStr()+"|gem|"+user).slice(0,3);
+}
+function gemHere(){ const p=prof(); if(p.gemDay!==todayStr()){p.gemDay=todayStr();p.gemGot=[];}
+  const key=CC.id+"|"+readIdx;
+  return todayGems().includes(key)&&!(p.gemGot||[]).includes(key); }
+function gemPick(){ const p=prof(); const key=CC.id+"|"+readIdx;
+  if((p.gemGot||[]).includes(key))return;
+  p.gemGot=p.gemGot||[]; p.gemGot.push(key); surPlus(15);
+  const el=document.getElementById("gemw"); if(el)el.innerHTML='<div style="font-size:15px;font-weight:700;color:var(--teal)">💎 +15 sürpriz puan! ('+p.gemGot.length+'/3 bugün)</div>';
+  sndSection(); try{confetti();}catch(e){}
+}
+function firsatCourse(){ // günün 1,5x fırsat kursu (kişiye özel)
+  const p=prof()||{}; const exam=p.exam||{};
+  let cand=COURSES.filter(c=>!c.retired&&exam[c.id]==null).map(c=>c.id);
+  if(!cand.length) cand=COURSES.filter(c=>!c.retired).map(c=>c.id);
+  return seededShuffle(cand.slice(),todayStr()+"|firsat|"+user)[0];
+}
 function startExam(resume){
   ex={secs:buildSections(), si:0, i:0, lives:LIVES, score:0, streak:0, timer:null, remain:Q_TIME, answered:false, late:false};
   if(resume){ const r=(prof().run||{})[CC.id]; if(r){ ex.si=Math.min(r.sec, ex.secs.length-1); ex.lives=r.lives; ex.score=r.score; } }
@@ -561,7 +596,7 @@ function examRender(){
     <div class="qtop"><div class="qbar"><span style="width:${pct}%"></span></div>
       <div class="qhearts">Soru ${ex.i+1}/${sec.pool.length}</div></div>
     <div class="timer"><span id="tbar"></span></div>
-    <div class="qtext">${q.q}</div>
+    ${q.gold?`<div class="goldq">⭐ ALTIN SORU — doğru cevaba +20</div>`:``}<div class="qtext">${q.q}</div>
     ${q.img&&!q.hs?`<img class="qimg" src="${resolveFig(q.img)}" alt="">`:``}
     ${q.sim?(()=>{const st=q.steps[ex.simStep||0];return `<div class="zoomhint" style="font-size:13.5px;color:var(--teal);font-weight:700">🕹 Adım ${(ex.simStep||0)+1}/${q.steps.length}: ${st.i}</div><div class="hswrap"><img src="${resolveFig(st.img)}" alt="">${st.zones.map((z,zi)=>`<div class="hsz" id="hz${zi}" onclick="simPick(${zi})" style="left:${z[0]}%;top:${z[1]}%;width:${z[2]}%;height:${z[3]}%"></div>`).join("")}</div><div id="opts"></div>`;})()
     :q.ord?`<div id="opts">${(ex.ordView=shuffle(q.items.map((t,i)=>i))).map((ti,di)=>`<button class="ordbtn" id="ob${di}" onclick="ordPick(${di})">${q.items[ti]}</button>`).join("")}</div><div class="zoomhint">👆 Adımlara DOĞRU SIRAYLA dokun</div>`
@@ -594,7 +629,7 @@ function qdone(ok,extraEx){
   recTele(ok, ex.qt?Math.min(120,(Date.now()-ex.qt)/1000):null);
   const exl=document.getElementById("exp");
   if(ok&&ex.late){ ex.streak=0; ex.score+=LATE_PTS; sndCorrect(); exl.className="explain ok show"; exl.innerHTML=`✓ Doğru (süre doldu) <b>+${LATE_PTS} puan</b><br>${q.ex}`; updHud(); afterAnswer(); }
-  else if(ok){ ex.streak++; const speed=Math.round(Math.max(0,ex.remain)/(ex.curT||Q_TIME)*BASE_PTS); const sb=Math.min(ex.streak,5)*2; const g=BASE_PTS+speed+sb; ex.score+=g; sndCorrect(); exl.className="explain ok show"; exl.innerHTML=`✓ Doğru! <b>+${g} puan</b> <small>(temel ${BASE_PTS} · hız ${speed} · seri ${sb})</small><br>${q.ex}`; updHud(); afterAnswer(); }
+  else if(ok){ ex.streak++; const speed=Math.round(Math.max(0,ex.remain)/(ex.curT||Q_TIME)*BASE_PTS); const sb=Math.min(ex.streak,5)*2; let g=BASE_PTS+speed+sb; if(q.gold)g+=20; ex.score+=g; sndCorrect(); exl.className="explain ok show"; exl.innerHTML=`${q.gold?"⭐ ":""}✓ Doğru! <b>+${g} puan</b> <small>(temel ${BASE_PTS} · hız ${speed} · seri ${sb})</small><br>${q.ex}`; updHud(); afterAnswer(); }
   else { sndWrong(); recErr(); loseLife("✗ Yanlış! <b>−"+WRONG_PENALTY+" puan</b><br>"+(extraEx||q.ex)); }
 }
 function ordPick(di){
@@ -650,10 +685,10 @@ function hsPick(zi){
     ex.streak++;
     const speed=Math.round(Math.max(0,ex.remain)/(ex.curT||Q_TIME)*BASE_PTS);
     const sb=Math.min(ex.streak,5)*2;
-    const g=BASE_PTS+speed+sb; ex.score+=g;
+    let g=BASE_PTS+speed+sb; if(q.gold)g+=20; ex.score+=g;
     sndCorrect();
     exl.className="explain ok show";
-    exl.innerHTML=`✓ Doğru bölge! <b>+${g} puan</b> <small>(temel ${BASE_PTS} · hız ${speed} · seri ${sb})</small><br>${q.ex}`;
+    exl.innerHTML=`${q.gold?"⭐ ":""}✓ Doğru bölge! <b>+${g} puan</b> <small>(temel ${BASE_PTS} · hız ${speed} · seri ${sb})</small><br>${q.ex}`;
     updHud(); afterAnswer();
   } else {
     const w=document.getElementById("hz"+zi); if(w)w.classList.add("bad");
@@ -678,10 +713,10 @@ function examPick(k){
     ex.streak++;
     const speed=Math.round(Math.max(0,ex.remain)/(ex.curT||Q_TIME)*BASE_PTS);
     const sb=Math.min(ex.streak,5)*2;
-    const g=BASE_PTS+speed+sb; ex.score+=g;
+    let g=BASE_PTS+speed+sb; if(q.gold)g+=20; ex.score+=g;
     sndCorrect();
     exl.className="explain ok show";
-    exl.innerHTML=`✓ Doğru! <b>+${g} puan</b> <small>(temel ${BASE_PTS} · hız ${speed} · seri ${sb})</small><br>${q.ex}`;
+    exl.innerHTML=`${q.gold?"⭐ ":""}✓ Doğru! <b>+${g} puan</b> <small>(temel ${BASE_PTS} · hız ${speed} · seri ${sb})</small><br>${q.ex}`;
     updHud(); afterAnswer();
   } else {
     const wbtn=document.getElementById("o"+k); if(wbtn)wbtn.classList.add("wrong");
@@ -746,7 +781,8 @@ function examWin(){
   const p=prof(); p.exam=p.exam||{}; p.firstDone=p.firstDone||{};
   const firstDone=!p.firstDone[CC.id];
   const lifeB=ex.lives*LIFE_BONUS, fb=firstDone?FIRST_BONUS:0;
-  const total=ex.score+lifeB+FINISH_BONUS+fb;
+  let total=ex.score+lifeB+FINISH_BONUS+fb;
+  const firsat=(!ex.mode&&CC.id===firsatCourse()); if(firsat) total=Math.round(total*1.5);
   if(firstDone)p.firstDone[CC.id]=true;
   const prev=p.exam[CC.id]||0, isBest=total>prev;
   if(isBest)p.exam[CC.id]=total;
@@ -757,7 +793,7 @@ function examWin(){
     <div class="motive">🎉 Tebrikler, kılavuzu bitirdin!</div>
     <h2>${CC.title} tamamlandı</h2>
     <div class="rs">${total} puan</div>
-    <p>Sorular ${ex.score}p · kalan can ${ex.lives}×${LIFE_BONUS}=${lifeB}p · bitirme +${FINISH_BONUS}p${firstDone?' · <b>ilk bitirme +'+FIRST_BONUS+'</b>':''}<br>
+    <p>Sorular ${ex.score}p · kalan can ${ex.lives}×${LIFE_BONUS}=${lifeB}p · bitirme +${FINISH_BONUS}p${firstDone?' · <b>ilk bitirme +'+FIRST_BONUS+'</b>':''}${firsat?' · <b>🔥 Fırsat kursu ×1,5</b>':''}<br>
     ${isBest?'🎉 En iyi skorun! Sıralamaya işlendi.':('En iyin: '+prev+' puan (bu tur daha düşük).')}${firstDone?' 🥇 İlk bitirme bonusu senin!':''}</p>
     <button class="btn green" onclick="startExam(false)">Tekrar oyna (skorunu geç)</button>
     <button class="btn secondary" onclick="screenLeaderboard()">🏅 Sıralama</button>
@@ -817,7 +853,7 @@ function mySummary(name){
   const p=store.profiles[name]||{}; const exam=p.exam||{};
   const courses={}; let total=0, comp=0;
   COURSES.forEach(c=>{ const s=exam[c.id]; if(s!=null){courses[c.id]={score:s}; total+=s; comp++;} });
-  ["gunluk","seri"].forEach(k=>{ if(exam[k]){ courses[k]={score:exam[k]}; total+=exam[k]; } });
+  ["gunluk","seri","surpriz"].forEach(k=>{ if(exam[k]){ courses[k]={score:exam[k]}; total+=exam[k]; } });
   const st=(p.stats||{}); return {n:name,ts:Date.now(),total,done:comp,courses,t:st.t||0,lt:st.lt||0,sc:st.s||0,last:st.last||0,err:p.err||{},tele:p.tele||null};
 }
 /* ---- Ay sonu (TR saatiyle gece yarısı) anlık görüntü ---- */
