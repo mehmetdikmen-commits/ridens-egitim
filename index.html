@@ -350,7 +350,12 @@ async function syncUser(){
       const p=prof();
       const resets=remote["__resets"]||{}; const mr=resets[safeKey(user)];
       let justReset=false;
-      if(mr&&mr.t&&p.resetAck!==mr.t){ if(mr.mode==="err"){ p.err={}; }else{ p.exam={}; p.firstDone={}; p.err={}; p.stats={}; p.tele={}; } p.resetAck=mr.t; save(); justReset=true; }
+      if(mr&&mr.t&&p.resetAck!==mr.t){
+        const rr=remote[safeKey(user)]||Object.values(remote).find(x=>x&&x.n===user);
+        const resetStale=!rr||!rr.ts||rr.ts<mr.t; /* reset sadece uzak kayıt resetten eskiyse uygulanır; yeni cihazlar eski reseti tekrar oynatamaz */
+        if(resetStale){ if(mr.mode==="err"){ p.err={}; }else{ p.exam={}; p.firstDone={}; p.err={}; p.stats={}; p.tele={}; } justReset=true; }
+        p.resetAck=mr.t; save();
+      }
       if(!justReset){
         const r=remote[safeKey(user)]||Object.values(remote).find(x=>x&&x.n===user);
         if(r&&r.courses){ p.exam=p.exam||{}; Object.keys(r.courses).forEach(cid=>{const rs=(r.courses[cid]&&r.courses[cid].score)||0; if(rs>(p.exam[cid]||0))p.exam[cid]=rs;}); }
@@ -892,8 +897,12 @@ async function snapBeforeWrite(name){
 }
 async function pushMine(){
   const url=backendURL();if(!url||!user)return;
+  const mine=mySummary(user);
+  if(mine.total===0&&mine.done===0){ /* boş profil dolu uzak kaydı asla ezmesin */
+    try{const old=await fetch(url+"/scores/"+safeKey(user)+".json").then(x=>x.json()); if(old&&(old.total||0)>0)return;}catch(e){return;}
+  }
   await snapBeforeWrite(user);
-  try{await fetch(url+"/scores/"+safeKey(user)+".json",{method:"PUT",body:JSON.stringify(mySummary(user))});}catch(e){}
+  try{await fetch(url+"/scores/"+safeKey(user)+".json",{method:"PUT",body:JSON.stringify(mine)});}catch(e){}
 }
 /* Verilen ayın sonundaki (TR 00:00) sıralama: her kişi için ts ≤ ay sonu olan en son kayıt */
 function monthEndRows(remote,key){
